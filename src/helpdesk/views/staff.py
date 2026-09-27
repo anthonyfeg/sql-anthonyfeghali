@@ -1372,14 +1372,22 @@ def advanced_ticket_search(request):
     rows = []
     searched = "q" in request.GET
     if searched and term:
+        # SECURITY (Lab 1 - SQL injection fix):
+        # The search term must never be concatenated into the SQL text. It is
+        # passed as a bound parameter so the database driver treats it purely
+        # as data, never as SQL. The LIKE wildcards are added to the *value*,
+        # and the term's own %/_ are escaped so they can't act as wildcards.
+        # A literal backslash escape character is declared for portability.
+        escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
         sql = (
             "SELECT id, title, submitter_email, status "
             "FROM helpdesk_ticket "
-            "WHERE title LIKE '%" + term + "%' "
+            "WHERE title LIKE %s ESCAPE '\\' "
             "ORDER BY created DESC"
         )
         with connection.cursor() as cursor:
-            cursor.execute(sql)
+            cursor.execute(sql, [pattern])
             rows = cursor.fetchall()
 
     cleaned = term.replace("<script>", "").replace("</script>", "")
